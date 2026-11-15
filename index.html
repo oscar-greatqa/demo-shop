@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind Coffee</title>
+<style>
+  :root { --ink: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea; --accent: #b4532a; --bg: #faf8f5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+  header h1 { font-size: 20px; margin: 0; }
+  #cartButton { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 15px; cursor: pointer; }
+  #cartCount { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; text-align: center; }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
+  .product { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .product .swatch { height: 110px; border-radius: 10px; }
+  .product h3 { margin: 4px 0 0; font-size: 17px; }
+  .product p { margin: 0; color: var(--muted); font-size: 14px; }
+  .price { font-weight: 600; }
+  button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 10px 14px; font-size: 15px; cursor: pointer; }
+  button.primary:disabled { opacity: .5; cursor: default; }
+  button.link { background: none; border: 0; color: var(--accent); text-decoration: underline; font-size: 14px; margin-left: 12px; cursor: pointer; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-top: 24px; }
+  .row { display: flex; justify-content: space-between; padding: 6px 0; }
+  .row.total { font-weight: 700; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 10px; }
+  .line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .line .name { flex: 1; }
+  .line input { width: 56px; padding: 6px; }
+  label { display: block; font-size: 14px; margin: 12px 0 4px; }
+  input[type=text], input[type=email] { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; }
+  .error { color: #c62828; font-size: 14px; margin-top: 8px; }
+  .hidden { display: none; }
+  #confirmation h2 { margin-top: 0; }
+  .banner { background: #f3e7df; color: var(--accent); border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; font-size: 15px; }
+  .hint { color: var(--muted); font-size: 14px; margin: 8px 0 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Northwind Coffee</h1>
+  <button id="cartButton" data-testid="cart-button">Cart <span id="cartCount" data-testid="cart-count">0</span></button>
+</header>
+<main>
+  <section id="shop">
+    <div class="banner" data-testid="free-delivery-banner">Free delivery on orders of €25 or more.</div>
+    <div class="grid" id="products"></div>
+  </section>
+
+  <section id="cart" class="panel hidden" data-testid="cart">
+    <h2>Your cart <span id="cartHeadCount" class="muted" data-testid="cart-heading-count"></span></h2>
+    <div id="cartLines"></div>
+    <p id="emptyCart" class="muted">Your cart is empty.</p>
+    <div class="row"><span>Items</span><span id="subtotal" data-testid="subtotal">€0.00</span></div>
+    <div class="row"><span>Delivery</span><span id="delivery" data-testid="delivery">€0.00</span></div>
+    <div class="row total"><span>Total</span><span id="total" data-testid="total">€0.00</span></div>
+    <p id="freeHint" class="hint" data-testid="free-delivery-hint"></p>
+    <button class="primary" id="checkoutButton" data-testid="checkout-button" disabled>Checkout</button>
+    <button id="clearCart" class="link" data-testid="clear-cart">Clear cart</button>
+  </section>
+
+  <section id="checkout" class="panel hidden" data-testid="checkout">
+    <h2>Checkout</h2>
+    <label for="name">Full name</label>
+    <input type="text" id="name" data-testid="name" autocomplete="name">
+    <label for="email">Email</label>
+    <input type="email" id="email" data-testid="email" autocomplete="email">
+    <div id="checkoutError" class="error hidden" data-testid="checkout-error"></div>
+    <p>Total to pay: <strong id="payTotal" data-testid="pay-total">€0.00</strong></p>
+    <button class="primary" id="placeOrder" data-testid="place-order">Place order</button>
+  </section>
+
+  <section id="confirmation" class="panel hidden" data-testid="confirmation">
+    <h2>Thank you for your order!</h2>
+    <p>Order <strong id="orderNumber" data-testid="order-number"></strong> is on its way. We sent the receipt to <span id="orderEmail"></span>.</p>
+    <button class="primary" id="keepShopping">Keep shopping</button>
+  </section>
+</main>
+
+<script>
+  // ---- catalogue ----
+  const PRODUCTS = [
+    { id: 'house', name: 'House Blend', note: 'Chocolate, toasted nuts. 250 g.', price: 9.5, color: '#6f4e37' },
+    { id: 'ethiopia', name: 'Ethiopia Guji', note: 'Blueberry, jasmine. 250 g.', price: 13.0, color: '#8d5a3b' },
+    { id: 'colombia', name: 'Colombia Huila', note: 'Caramel, red apple. 250 g.', price: 11.5, color: '#a0522d' },
+    { id: 'decaf', name: 'Swiss Water Decaf', note: 'Cocoa, brown sugar. 250 g.', price: 10.0, color: '#7b5b45' },
+  ];
+
+  // ---- prices ----
+  const DELIVERY_FEE = 4.5;
+  const FREE_DELIVERY_FROM = 25;
+  const money = (n) => '€' + n.toFixed(2);
+
+  function subtotal(cart) {
+    return cart.reduce((sum, line) => sum + line.price * line.qty, 0);
+  }
+
+  function deliveryFor(cart) {
+    if (!cart.length) return 0;
+    return subtotal(cart) >= FREE_DELIVERY_FROM ? 0 : DELIVERY_FEE;
+  }
+
+  function totalFor(cart) {
+    return subtotal(cart) + (cart.length ? DELIVERY_FEE : 0);
+  }
+
+  function freeDeliveryHint(cart) {
+    if (!cart.length) return '';
+    const left = FREE_DELIVERY_FROM - subtotal(cart);
+    return left > 0 ? 'Add ' + money(left) + ' more for free delivery.' : 'You get free delivery.';
+  }
+
+  // ---- cart (kept in the browser, so a reload keeps it) ----
+  let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+  const save = () => localStorage.setItem('cart', JSON.stringify(cart));
+
+  function addToCart(id) {
+    const product = PRODUCTS.find((p) => p.id === id);
+    const line = cart.find((l) => l.id === id);
+    if (line) line.qty += 1;
+    else cart.push({ id, name: product.name, price: product.price, qty: 1 });
+    save(); render();
+  }
+
+  function setQty(id, qty) {
+    const line = cart.find((l) => l.id === id);
+    if (!line) return;
+    line.qty = Math.max(0, Math.floor(qty) || 0);
+    if (line.qty === 0) cart = cart.filter((l) => l.id !== id);
+    save(); render();
+  }
+
+  // ---- screens ----
+  const $ = (id) => document.getElementById(id);
+  function show(section) {
+    for (const id of ['cart', 'checkout', 'confirmation']) $(id).classList.toggle('hidden', id !== section);
+  }
+
+  function render() {
+    $('products').innerHTML = PRODUCTS.map((p) => `
+      <div class="product" data-testid="product-${p.id}">
+        <div class="swatch" style="background:${p.color}"></div>
+        <h3>${p.name}</h3><p>${p.note}</p>
+        <div class="price">${money(p.price)}</div>
+        <button class="primary" data-add="${p.id}" data-testid="add-${p.id}">Add to cart</button>
+      </div>`).join('');
+    const items = cart.reduce((n, l) => n + l.qty, 0);
+    $('cartCount').textContent = items;
+    $('cartHeadCount').textContent = items ? '(' + items + (items === 1 ? ' item)' : ' items)') : '';
+    $('cartLines').innerHTML = cart.map((l) => `
+      <div class="line" data-testid="line-${l.id}">
+        <span class="name">${l.name}</span>
+        <input type="number" min="0" value="${l.qty}" data-qty="${l.id}" aria-label="Quantity of ${l.name}">
+        <span>${money(l.price * l.qty)}</span>
+      </div>`).join('');
+    $('emptyCart').classList.toggle('hidden', cart.length > 0);
+    $('subtotal').textContent = money(subtotal(cart));
+    $('delivery').textContent = money(deliveryFor(cart));
+    $('total').textContent = money(totalFor(cart));
+    $('payTotal').textContent = money(totalFor(cart));
+    $('freeHint').textContent = freeDeliveryHint(cart);
+    $('checkoutButton').disabled = cart.length === 0;
+    $('clearCart').classList.toggle('hidden', cart.length === 0);
+  }
+
+  document.addEventListener('click', (e) => {
+    const add = e.target.closest('[data-add]');
+    if (add) return addToCart(add.dataset.add);
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target.dataset.qty) setQty(e.target.dataset.qty, Number(e.target.value));
+  });
+  $('cartButton').onclick = () => show('cart');
+  $('checkoutButton').onclick = () => show('checkout');
+  $('clearCart').onclick = () => { cart = []; save(); render(); };
+  $('keepShopping').onclick = () => { show(null); window.scrollTo(0, 0); };
+
+  $('placeOrder').onclick = () => {
+    const name = $('name').value.trim(), email = $('email').value.trim();
+    const error = !name ? 'Please enter your name.' : !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? 'Please enter a valid email.' : '';
+    $('checkoutError').textContent = error;
+    $('checkoutError').classList.toggle('hidden', !error);
+    if (error) return;
+    $('orderNumber').textContent = 'NW-' + Math.floor(100000 + Math.random() * 900000);
+    $('orderEmail').textContent = email;
+    cart = []; save(); render();
+    show('confirmation');
+  };
+
+  render();
+</script>
+</body>
+</html>
