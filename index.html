@@ -28,6 +28,7 @@
   .line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .line .name { flex: 1; }
   .line input { width: 56px; padding: 6px; }
+  .line .remove { background: none; border: 0; color: #a33; font-size: 13px; cursor: pointer; text-decoration: underline; }
   label { display: block; font-size: 14px; margin: 12px 0 4px; }
   input[type=text], input[type=email] { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; }
   .error { color: #c62828; font-size: 14px; margin-top: 8px; }
@@ -153,6 +154,7 @@
         <span class="name">${l.name}</span>
         <input type="number" min="0" value="${l.qty}" data-qty="${l.id}" aria-label="Quantity of ${l.name}">
         <span>${money(l.price * l.qty)}</span>
+        <button class="remove" data-remove="${l.id}" data-testid="remove-${l.id}" aria-label="Remove ${l.name}">Remove</button>
       </div>`).join('');
     $('emptyCart').classList.toggle('hidden', cart.length > 0);
     $('subtotal').textContent = money(subtotal(cart));
@@ -167,6 +169,8 @@
   document.addEventListener('click', (e) => {
     const add = e.target.closest('[data-add]');
     if (add) return addToCart(add.dataset.add);
+    const remove = e.target.closest('[data-remove]');
+    if (remove) return setQty(remove.dataset.remove, 0);
   });
   document.addEventListener('change', (e) => {
     if (e.target.dataset.qty) setQty(e.target.dataset.qty, Number(e.target.value));
